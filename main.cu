@@ -3,7 +3,7 @@
 #include "clib/ndarray.h"
 
 
-#define CHECK(call)                                                             \
+#define CUDA_CHECK(call)                                                        \
 {                                                                               \
     const cudaError_t error = call;                                             \
     if (error != cudaSuccess)                                                   \
@@ -14,69 +14,103 @@
     }                                                                           \
 }
 
-
-__global__ void hello(ndarray* A){
-
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-
-    printf("Thread %d: %2f\n", i, A->data[i]);
-}
-
-ndarray* toDevice(ndarray* A)
+ndarray* toDevice(ndarray* A, bool _free)
 {
+    ndarray *A_dev = (ndarray*) malloc(sizeof(ndarray));
+    int n =  A->shape[0] * A->shape[1];
 
-    //ndarray *A_dev = (ndarray*) malloc(sizeof(ndarray));
-    ndarray* A_dev;
-    CHECK(cudaMalloc((void**)&A_dev, sizeof(ndarray)));
+    CUDA_CHECK(cudaMalloc((void**)&(A_dev->shape), 2 * sizeof(int)));
+    CUDA_CHECK(cudaMalloc((void**)&(A_dev->data), n * sizeof(double)));
 
-    CHECK(cudaMalloc((void**)&(A_dev->shape), 2 * sizeof(int)));
-    CHECK(cudaMalloc((void**)&(A_dev->data), A->shape[0] * A->shape[1] * sizeof(double)));
+    CUDA_CHECK(cudaMemcpy((void*)(A_dev->shape), (void*)(A->shape), 2 * sizeof(int), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy((void*)(A_dev->data), (void*)(A->data), n * sizeof(double), cudaMemcpyHostToDevice));
 
-
-    CHECK(cudaMemcpy((void*)A_dev->shape, (void*)A->shape, 2 * sizeof(int), cudaMemcpyHostToDevice));
-    CHECK(cudaMemcpy((void*)A_dev->data, (void*)A->data, A->shape[0] * A->shape[1] * sizeof(double), cudaMemcpyHostToDevice));
+    if(!_free)
+    {
+        return A_dev;
+    }  
+    
+    free_(A);
 
     return A_dev;
 }
 
-
-
-
-int* toDevice1(int* A, int n){
-
-    int* a;
-    cudaMalloc((void**)&a, n * sizeof(int));
-
-
-    
-    cudaMemcpy((void*)a, (void*)A, n * sizeof(int), cudaMemcpyHostToDevice);
-
-    return a;
-} 
-
-
-void init(double* V, int n)
+ndarray* toHost(ndarray* A_dev, bool _free)
 {
-    for(int i = 0; i < n; i++)
-        V[i] = 1;
+    ndarray *A = (ndarray*) malloc(sizeof(ndarray));
+
+    A->shape = (int*) malloc(2 * sizeof(int));
+    CUDA_CHECK(cudaMemcpy((void*)(A->shape), (void*)(A_dev->shape),  2 * sizeof(int), cudaMemcpyDeviceToHost));
+    
+    int n = A->shape[0] * A->shape[1];
+
+    A->data = (double*) malloc(n * sizeof(double));
+    CUDA_CHECK(cudaMemcpy((void*)(A->data), (void*)(A_dev->data), n * sizeof(double), cudaMemcpyDeviceToHost));
+
+    if(!_free)
+    {
+        return A;
+    }
+    
+    cudaFree(A_dev->shape);
+    cudaFree(A_dev->data);
+    free(A_dev);
+
+    return A;
+}
+
+__global__ void init(ndarray A)
+{
+    int i = blockDim.x * blockIdx.x + threadIdx.x;
+
+    A.data[i] = i;
+
+}
+
+
+
+__global__ void cudaTranspose(ndarray A)
+{
+    int tidx = blockDim.y * threadIdx.x + threadIdx.y;
+    int tidy = blockDim.x * threadIdx.y + threadIdx.x;
+
+    int i = gridDim.x * blockIdx.x + tidx;
+
+    //__shared__ double sm[4];
+    
+
+
+    printf("bid: %d, tidx: %d, tidy: %d, i: %d\n", blockIdx.x, tidx, tidy, i);
+
+    //printf("i: %d * %d + %d = %d\n", blockDim.x, blockIdx.x, threadIdx.x, i);
+    //printf("gmi: %d + %d = %d\n", blockIdx.x, smi, blockIdx.x + smi);
+    //printf("j: %d * %d + %d\n", blockDim.y, blockIdx.y, threadIdx.y);
+    //printf("tid:%d, %d\nsmi: %d\ngmi: %d\n", threadIdx.x, threadIdx.y, smi, gmi);
+
+
+
 }
 
 int main(){
 
-    int n = 20;
+    
+    ndarray *A = new_ndarray(4, 4, NULL);
+    int n = A->shape[0] * A->shape[1];
+
+    ndarray* A_dev = toDevice(A, true);
+
+    init <<<1, n>>> (*A_dev);
+    cudaDeviceSynchronize();
+
+    print(toHost(A_dev, false));
+
+
     
 
-    ndarray* a = new_ndarray(2, 10, NULL);
-    init(a->data, n);
-    print(a);
-    //fun(2);
-
-    ndarray* adev = toDevice(a);
-
-    //int* A_dev = toDevice1(v, n);
-    //int* B_dev = toDevice1(v, n);
-
-    hello <<<1, n>>>(adev);
+    cudaTranspose <<<4, dim3(2,2)>>>(*A_dev);
     cudaDeviceSynchronize();
+
+    //a = toHost(adev, true);
+    //print(a);
 
 }
