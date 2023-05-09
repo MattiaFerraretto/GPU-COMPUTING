@@ -14,6 +14,53 @@
     }                                                                           \
 }
 
+#define BLOCKDIMX 16
+#define BLOCKDIMY 16
+
+__global__ void cudaInit(ndarray A, double value)
+{
+    int i = blockDim.x * blockIdx.x + threadIdx.x;
+
+    if(i < A.shape[0] * A.shape[1])
+        A.data[i] = value;
+}   
+
+__host__ ndarray* cudaNewndarray(int rows, int columns, double value)
+{
+    ndarray* A_dev = (ndarray*) malloc(sizeof(ndarray));
+    int* shape = (int*) malloc(2 * sizeof(int));
+
+    shape[0] = rows;
+    shape[1] = columns;
+
+    int n = rows * columns;
+    
+    CUDA_CHECK(cudaMalloc((void**)&(A_dev->shape), 2 * sizeof(int)));
+    CUDA_CHECK(cudaMalloc((void**)&(A_dev->data), n * sizeof(double)));
+
+    //CUDA_CHECK(cudaMemset((void*)(A_dev->data), *((long*)&value), n * sizeof(double)));
+
+    CUDA_CHECK(cudaMemcpy((void*)(A_dev->shape), (void*)(shape), 2 * sizeof(int), cudaMemcpyHostToDevice));
+    free(shape);
+    
+    dim3 block(BLOCKDIMX * BLOCKDIMY);
+    dim3 grid((rows * columns + block.x - 1) / block.x);
+   
+    //printf("%d, %d\n", grid.x, block.x);
+
+    cudaInit <<<grid, block>>> (*A_dev, value);
+    CUDA_CHECK(cudaDeviceSynchronize());    
+
+    return A_dev;
+}
+
+__host__ void cudaFree_(ndarray* A_dev)
+{
+    cudaFree(A_dev->shape);
+    cudaFree(A_dev->data);
+    free(A_dev);
+}
+
 __host__ ndarray* toDevice(ndarray* A, bool _free)
 {
     ndarray *A_dev = (ndarray*) malloc(sizeof(ndarray));
@@ -33,13 +80,6 @@ __host__ ndarray* toDevice(ndarray* A, bool _free)
     free_(A);
 
     return A_dev;
-}
-
-__host__ void cudaFree_(ndarray* A_dev)
-{
-    cudaFree(A_dev->shape);
-    cudaFree(A_dev->data);
-    free(A_dev);
 }
 
 __host__ ndarray* toHost(ndarray* A_dev, bool _free)
@@ -69,68 +109,100 @@ __global__ void cudaTranspose(ndarray A, ndarray AT)
     int i = blockDim.x * blockIdx.x + threadIdx.x;
     int j = blockDim.y * blockIdx.y + threadIdx.y;
 
-    int rIndex = blockDim.x * blockDim.y * i + j;
-    int cIndex = blockDim.x * blockDim.y * j + i;
+    __shared__ double tile[BLOCKDIMX][BLOCKDIMY];
 
-    //int rIndex = A.shape[0] * A.shape[1] * i + j;
-    //int cIndex = A.shape[0] * A.shape[1] * j + i;
-
-
-    __shared__ double sm[16][16];
-
-    if(rIndex >  A.shape[0] * A.shape[1]){
-       
+    if(i > A.shape[0] || j > A.shape[1])
         return ;
 
-    }
-    
-    printf("(%d, %d) <- %d, %d; (%d, %d); (%d, %d)\n", threadIdx.x,  threadIdx.y, rIndex, cIndex, i, j, A.shape[0], A.shape[1]);
-
-    sm[threadIdx.x][threadIdx.y] = A.data[rIndex];
+    tile[threadIdx.x][threadIdx.y] = A.data[A.shape[1] * i + j];
     __syncthreads();
-
-    AT.data[cIndex] = sm[threadIdx.x][threadIdx.y];
+  
+     AT.data[A.shape[0] * j + i] = tile[threadIdx.x][threadIdx.y];
 }
 
-__host__ ndarray* cudaTranspose(ndarray* A)
+__host__ ndarray* cudaTranspose(ndarray* A, bool _free)
 {
-    ndarray *AT = new_ndarray(A->shape[1], A->shape[0], NULL);
-
     ndarray *A_dev = toDevice(A, false);
-    ndarray *AT_dev = toDevice(AT, true);
+    ndarray *AT_dev = cudaNewndarray(A->shape[1], A->shape[0], -1);
 
-    dim3 blockSize(16, 16);
+    dim3 block(BLOCKDIMX, BLOCKDIMY);
 
-    int gridx = (A->shape[1] + blockSize.x - 1) / blockSize.x;
-    int gridy = (A->shape[0] + blockSize.x - 1) / blockSize.y;
+    int gridx = (A->shape[0] + block.x - 1) / block.x;
+    int gridy = (A->shape[1] + block.x - 1) / block.y;
 
     dim3 grid(gridx, gridy);
 
-    printf("grid: (%d, %d); blockSize: (%d, %d)\n", grid.x, grid.y, blockSize.x, blockSize.y);
+    printf("grid: (%d, %d); blockSize: (%d, %d)\n", grid.x, grid.y, block.x, block.y);
 
-    cudaTranspose <<<grid, blockSize>>>(*A_dev, *AT_dev);
-    cudaDeviceSynchronize();
+    cudaTranspose <<<grid, block>>>(*A_dev, *AT_dev);
+    CUDA_CHECK(cudaDeviceSynchronize());
 
-    return toHost(AT_dev, true);
+    return toHost(AT_dev, _free);
 }
 
-void init(ndarray* A)
+__global__ void cudaMatSub(ndarray A, ndarray B, ndarray C)
+{
+    int i = blockDim.x * blockIdx.x + threadIdx.x;
+    int j = blockDim.y * blockIdx.y + threadIdx.y;
+
+    __shared__ double A_tile[BLOCKDIMX][BLOCKDIMY];
+    __shared__ double B_tile[BLOCKDIMX][BLOCKDIMY];
+
+    if(i > A.shape[0] || j > A.shape[1])
+        return ;
+
+    printf("%d, %d\n", i, j);
+
+    A_tile[threadIdx.x][threadIdx.y] = A.data[A.shape[1] * i + j];
+    B_tile[threadIdx.x][threadIdx.y] = B.data[A.shape[1] * i + j];
+
+    __syncthreads();
+
+    C.data[A.shape[0] * i + j] = A_tile[threadIdx.x][threadIdx.y] - B_tile[threadIdx.x][threadIdx.y];
+}
+
+__host__ ndarray* cudaMatSub(ndarray* A, ndarray* B, bool _free)
+{
+    ndarray* A_dev = toDevice(A, false);
+    ndarray* B_dev = toDevice(B, false);
+    ndarray* C_dev = cudaNewndarray(A->shape[0], A->shape[1], -1);
+
+    dim3 block(BLOCKDIMX, BLOCKDIMY);
+
+    int gridx = (A->shape[0] + block.x - 1) / block.x;
+    int gridy = (A->shape[1] + block.x - 1) / block.y;
+
+    dim3 grid(gridx, gridy);
+
+    printf("grid: (%d, %d); blockSize: (%d, %d)\n", grid.x, grid.y, block.x, block.y);
+
+    cudaMatSub <<<grid, block>>>(*A_dev, *B_dev, *C_dev);
+    CUDA_CHECK(cudaDeviceSynchronize());
+
+    return toHost(C_dev, _free);
+}
+
+void init(ndarray* A, double value)
 {
     for(int i = 0; i < A->shape[0] * A->shape[1]; i++)
     {
-        A->data[i] = i;
+        A->data[i] = value;
     }
 }
 
 int main(){
 
-    
-    ndarray* A = new_ndarray(4, 4, NULL);
-    init(A);
+    ndarray* A = new_ndarray(2,2, NULL);
+    init(A, 10);
 
-    ndarray* AT = cudaTranspose(A);
+    ndarray* B = new_ndarray(2,2, NULL);
+    init(B, 2);
+
+    //ndarray* AT = cudaTranspose(A, true);
+
+    ndarray* C = cudaMatSub(A, B, true);
     
     print(A);
-    print(AT);
+    print(C);
 
 }
