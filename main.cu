@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <time.h>
+#include <math.h>
 
 #include "clib/ndarray.h"
 
@@ -57,8 +58,8 @@ __host__ ndarray* cudaNewndarray(int rows, int columns, double value)
 
 __host__ void cudaFree_(ndarray* A_dev)
 {
-    cudaFree(A_dev->shape);
-    cudaFree(A_dev->data);
+    CUDA_CHECK(cudaFree(A_dev->shape));
+    CUDA_CHECK(cudaFree(A_dev->data));
     free(A_dev);
 }
 
@@ -118,10 +119,10 @@ __global__ void cudaTranspose(ndarray A, ndarray AT)
     tile[threadIdx.y][threadIdx.x] = A.data[A.shape[1] * i + j];
     __syncthreads();
   
-     AT.data[A.shape[0] * j + i] = tile[threadIdx.y][threadIdx.x];
+    AT.data[A.shape[0] * j + i] = tile[threadIdx.y][threadIdx.x];
 }
 
-__host__ ndarray* cudaTranspose(ndarray* A, bool _free)
+__host__ ndarray* cudaTranspose(ndarray* A, bool A_devFree, bool AT_devFree)
 {
     ndarray *A_dev = toDevice(A, false);
     ndarray *AT_dev = cudaNewndarray(A->shape[1], A->shape[0], -1);
@@ -130,7 +131,6 @@ __host__ ndarray* cudaTranspose(ndarray* A, bool _free)
 
     int gridx = (A->shape[1] + block.x - 1) / block.x;
     int gridy = (A->shape[0] + block.y - 1) / block.y;
-
     dim3 grid(gridx, gridy);
 
     printf("grid: (%d, %d); blockSize: (%d, %d)\n", grid.x, grid.y, block.x, block.y);
@@ -138,7 +138,10 @@ __host__ ndarray* cudaTranspose(ndarray* A, bool _free)
     cudaTranspose <<<grid, block>>>(*A_dev, *AT_dev);
     CUDA_CHECK(cudaDeviceSynchronize());
 
-    return toHost(AT_dev, _free);
+    if(A_devFree)
+        cudaFree_(A_dev);
+
+    return toHost(AT_dev, AT_devFree);
 }
 
 __global__ void cudaMatSub(ndarray A, ndarray B, ndarray C)
@@ -160,8 +163,15 @@ __global__ void cudaMatSub(ndarray A, ndarray B, ndarray C)
     C.data[A.shape[1] * i + j] = A_tile[threadIdx.y][threadIdx.x] - B_tile[threadIdx.y][threadIdx.x];
 }
 
-__host__ ndarray* cudaMatSub(ndarray* A, ndarray* B, bool _free)
+__host__ ndarray* cudaMatSub(ndarray* A, ndarray* B, bool A_devFree, bool B_devFree, bool C_devFree)
 {
+    if(A->shape[0] != A->shape[0] || A->shape[1] != B->shape[1])
+    {
+        printf("ERROR:: File: %s, Line: %d, ", __FILE__, __LINE__);
+        printf("reason: %d != %d || %d != %d; A and B must have the same size.\n", A->shape[0], B->shape[0], A->shape[1], B->shape[1]);
+        exit(EXIT_FAILURE); 
+    }
+
     ndarray* A_dev = toDevice(A, false);
     ndarray* B_dev = toDevice(B, false);
     ndarray* C_dev = cudaNewndarray(A->shape[0], A->shape[1], -1);
@@ -170,7 +180,6 @@ __host__ ndarray* cudaMatSub(ndarray* A, ndarray* B, bool _free)
 
     int gridx = (A->shape[1] + block.x - 1) / block.x;
     int gridy = (A->shape[0] + block.x - 1) / block.y;
-
     dim3 grid(gridx, gridy);
 
     printf("grid: (%d, %d); blockSize: (%d, %d)\n", grid.x, grid.y, block.x, block.y);
@@ -178,7 +187,105 @@ __host__ ndarray* cudaMatSub(ndarray* A, ndarray* B, bool _free)
     cudaMatSub <<<grid, block>>>(*A_dev, *B_dev, *C_dev);
     CUDA_CHECK(cudaDeviceSynchronize());
 
-    return toHost(C_dev, _free);
+    if(A_devFree)
+        cudaFree_(A_dev);
+
+    if(B_devFree)
+        cudaFree_(B_dev);
+
+    return toHost(C_dev, C_devFree);
+}
+
+__global__ void cudaMatScalarProduct(ndarray A, ndarray C, double value)
+{
+    int i = blockDim.y * blockIdx.y + threadIdx.y;
+    int j = blockDim.x * blockIdx.x + threadIdx.x;
+
+    __shared__ double tile[BLOCKDIMX][BLOCKDIMY];
+
+    if(i >=  A.shape[0] || j >= A.shape[1])
+        return ;
+
+    tile[threadIdx.y][threadIdx.x] = A.data[A.shape[1] * i + j];
+    __syncthreads();
+
+    C.data[A.shape[1] * i + j] = tile[threadIdx.y][threadIdx.x] * value;
+}
+
+__host__ ndarray* cudaMatScalarProduct(ndarray* A, double value, bool A_devFree, bool C_devFree)
+{
+    ndarray* A_dev = toDevice(A, false);
+    ndarray* C_dev = cudaNewndarray(A->shape[0], A->shape[1], -1);
+
+    dim3 block(BLOCKDIMX, BLOCKDIMY);
+
+    int gridx = (A->shape[1] + block.x - 1) / block.x;
+    int gridy = (A->shape[0] + block.x - 1) / block.y;
+    dim3 grid(gridx, gridy);
+
+    printf("grid: (%d, %d); blockSize: (%d, %d)\n", grid.x, grid.y, block.x, block.y);
+
+    cudaMatScalarProduct <<<grid, block>>>(*A_dev, *C_dev, value);
+    CUDA_CHECK(cudaDeviceSynchronize());
+
+    if(A_devFree)
+        cudaFree_(A_dev);
+
+    return toHost(C_dev, C_devFree);
+}
+
+__global__ void cudaNorm(ndarray A, ndarray C)
+{
+    int i = blockDim.x * blockIdx.x + threadIdx.x;
+    int tid = threadIdx.x;
+
+    __shared__ double tile[BLOCKDIMX * BLOCKDIMY];
+
+    if(i >= A.shape[1])
+        return ;
+
+    tile[tid] = A.data[i];
+    __syncthreads();
+
+    tile[tid] = pow(tile[tid], 2);
+    __syncthreads();
+
+    for(int stride = blockDim.x / 2; stride > 0; stride >>= 1)
+    {
+        if(tid < stride)
+        {
+            tile[tid] = tile[tid] + tile[tid + stride];
+        }
+        __syncthreads();
+    }
+
+    if(tid == 0)
+        C.data[blockIdx.x] = tile[0];
+
+}
+
+__host__ double cudaNorm(ndarray* A, bool A_devFree)
+{
+    ndarray* A_dev = toDevice(A, false);
+    
+    dim3 block(BLOCKDIMX * BLOCKDIMY);
+    dim3 grid((A->shape[1] + block.x - 1) / block.x);
+
+    printf("grid: %d, block: %d\n", grid.x, block.x);
+
+    ndarray* C_dev = cudaNewndarray(1, grid.x, -1);
+
+    cudaNorm <<<grid, block>>>(*A_dev, *C_dev);
+    CUDA_CHECK(cudaDeviceSynchronize());
+
+    ndarray* C = toHost(C_dev, true);
+
+    double norm = 0;
+
+    for(int i = 0; i < C->shape[1]; i++)
+        norm += C->data[i];
+
+    return sqrt(norm);
 }
 
 void init(ndarray* A)
@@ -187,13 +294,14 @@ void init(ndarray* A)
 
     for(int i = 0; i < A->shape[0] * A->shape[1]; i++)
     {
-        A->data[i] = (double)rand() / (double)RAND_MAX;
+        //A->data[i] = (double)rand() / (double)RAND_MAX;
+        A->data[i] = 1;
     }
 }
 
 int main(){
 
-    ndarray* A = new_ndarray(20,30, NULL);
+    ndarray* A = new_ndarray(1,500, NULL);
     init(A);
 
     ndarray* B = new_ndarray(2,2, NULL);
@@ -202,10 +310,14 @@ int main(){
     //ndarray* AT = cudaTranspose(A, true);
    
 
-    ndarray* C = cudaMatSub(A, A, true);
-    
-    print(A);
-    print(C);
+    //ndarray* C = cudaMatSub(A, A, true, true, true);
+
+    //ndarray* C = cudaMatScalarProduct(A, 2, true, true);
+
+    double nrm = cudaNorm(A, true);
+    printf("%2f\n", nrm);
+    //print(A);
+    //print(C);
     //print(AT);
 
 }
