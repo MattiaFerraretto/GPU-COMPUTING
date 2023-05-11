@@ -68,10 +68,10 @@ void print(ndarray* A)
 
         for( int j = 0; j < A->shape[1]; j++)
         {   
-            printf("%lf", A->data[A->shape[1] * i + j]);
+            printf("%-*.*lf", 10, 6, A->data[A->shape[1] * i + j]);
 
-            if(j != A->shape[1] - 1)
-                printf(" ");
+            //if(j != A->shape[1] - 1)
+            //    printf("\t");
         }
 
         if(i != A->shape[0] - 1)
