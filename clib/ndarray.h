@@ -4,11 +4,11 @@
 typedef struct ndarray_
 {   
     int* shape;
-    double* data;
+    float* data;
 
 } ndarray;
 
-ndarray* new_ndarray(int rows, int columns, double* data);
+ndarray* new_ndarray(int rows, int columns, float* data);
 
 void free_(ndarray* A);
 

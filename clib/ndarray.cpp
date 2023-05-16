@@ -5,7 +5,7 @@
 #include "ndarray.h"
 
 
-ndarray* new_ndarray(int rows, int columns, double* data)
+ndarray* new_ndarray(int rows, int columns, float* data)
 {
     ndarray* a = (ndarray*)malloc(sizeof(ndarray));
     int* shape = (int*)calloc(2, sizeof(int));
@@ -16,7 +16,7 @@ ndarray* new_ndarray(int rows, int columns, double* data)
     a->shape = shape;
 
     if(data == NULL)
-        a->data = (double*)calloc(rows * columns, sizeof(double));
+        a->data = (float*)calloc(rows * columns, sizeof(float));
     else
         a->data = data;
     
@@ -33,7 +33,7 @@ void free_(ndarray* A)
 
 ndarray* copy(ndarray* A)
 {
-    double* data = (double*)calloc(A->shape[0] * A->shape[1], sizeof(double));
+    float* data = (float*)calloc(A->shape[0] * A->shape[1], sizeof(float));
 
     for(int i = 0; i < A->shape[0] * A->shape[1]; i++)
     {
@@ -68,7 +68,7 @@ void print(ndarray* A)
 
         for( int j = 0; j < A->shape[1]; j++)
         {   
-            printf("%-*.*lf", 10, 6, A->data[A->shape[1] * i + j]);
+            printf("%-*.*f", 10, 6, A->data[A->shape[1] * i + j]);
 
             //if(j != A->shape[1] - 1)
             //    printf("\t");
@@ -96,7 +96,7 @@ void printShape(ndarray* A)
 ndarray* csv2ndarry(char* filePath, int rows, int features, char* delimiter)
 {
     FILE* fp = fopen(filePath, "r");
-    double* data_points = (double*)calloc(rows * features, sizeof(double));
+    float* data_points = (float*)calloc(rows * features, sizeof(float));
     char* buffer = (char*)malloc(1024 * sizeof(char));
 
     if(fp == NULL)
@@ -112,7 +112,7 @@ ndarray* csv2ndarry(char* filePath, int rows, int features, char* delimiter)
 
         for(int j = 0; j < features; j++)
         {
-            sscanf(token, "%lf", data_points + (features * i + j));
+            sscanf(token, "%f", data_points + (features * i + j));
             token = strtok(NULL, delimiter);
         }
     }
@@ -137,7 +137,7 @@ void ndarray2csv(ndarray* A, char* filePath, char* delimiter)
     {
         for(int j = 0; j < A->shape[1]; j++)
         {
-            fprintf(fp, "%2f", A->data[A->shape[1] * i + j]);
+            fprintf(fp, "%f", A->data[A->shape[1] * i + j]);
             fflush(fp);
             
             if(j != A->shape[1] - 1)

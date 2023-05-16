@@ -25,7 +25,7 @@ ndarray* PCA(ndarray* M, int d)
 
 void test1(){
 
-    double M_data[8] = {1, 2, 2, 1, 3, 4, 4, 3};
+    float M_data[8] = {1, 2, 2, 1, 3, 4, 4, 3};
     ndarray* M = new_ndarray(4, 2, M_data);
 
     ndarray* Mpca = PCA(M, 1);

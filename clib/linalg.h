@@ -33,7 +33,7 @@ ndarray* matProduct(ndarray* A, ndarray* B);
 
 ndarray* vectorsProduct(ndarray* RV, ndarray* CV);
 
-ndarray* matScalarProduct(ndarray* A, double scalar);
+ndarray* matScalarProduct(ndarray* A, float scalar);
 
 ndarray* matSub(ndarray* A, ndarray* B);
 
@@ -41,7 +41,7 @@ ndarray* transpose(ndarray* A);
 
 double norm(ndarray* X);
 
-void normalize(ndarray* X, double nrm);
+void normalize(ndarray* X, float nrm);
 
 float error(ndarray* x, ndarray* y);
 

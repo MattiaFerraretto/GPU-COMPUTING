@@ -13,10 +13,10 @@ ndarray* matProduct(ndarray* A, ndarray* B)
         return NULL;
     }
 
-    double* mp_data = (double*)calloc(A->shape[0] * B->shape[1], sizeof(double));
+    float* mp_data = (float*)calloc(A->shape[0] * B->shape[1], sizeof(float));
 
-    double* A_data = A->data;
-    double* B_data = B->data;
+    float* A_data = A->data;
+    float* B_data = B->data;
 
     for(int i = 0; i < A->shape[0]; i++)
     {
@@ -40,7 +40,7 @@ ndarray* vectorsProduct(ndarray* RV, ndarray* CV)
         return NULL;
     }
 
-    double* vp_data = (double*)calloc(RV->shape[1] * CV->shape[0], sizeof(double));
+    float* vp_data = (float*)calloc(RV->shape[1] * CV->shape[0], sizeof(float));
 
     for(int i = 0; i < RV->shape[1]; i++)
     {
@@ -53,9 +53,9 @@ ndarray* vectorsProduct(ndarray* RV, ndarray* CV)
     return new_ndarray(CV->shape[0], RV->shape[1], vp_data);
 }
 
-ndarray* matScalarProduct(ndarray* A, double scalar)
+ndarray* matScalarProduct(ndarray* A, float scalar)
 {
-    double* msp_data = (double*)calloc(A->shape[0] * A->shape[1], sizeof(double));
+    float* msp_data = (float*)calloc(A->shape[0] * A->shape[1], sizeof(float));
 
     for(int i = 0; i < A->shape[0] * A->shape[1]; i++)
     {
@@ -73,7 +73,7 @@ ndarray* matSub(ndarray* A, ndarray* B)
         return NULL;
     }
 
-    double* ms_data = (double*)calloc(A->shape[0] * A->shape[1], sizeof(double));
+    float* ms_data = (float*)calloc(A->shape[0] * A->shape[1], sizeof(float));
 
     for(int i = 0; i < A->shape[1] *  A->shape[0]; i++)
     {
@@ -86,7 +86,7 @@ ndarray* matSub(ndarray* A, ndarray* B)
 ndarray* transpose(ndarray* A)
 {
 
-    double* AT_data = (double*)calloc(A->shape[0] * A->shape[1], sizeof(double));
+    float* AT_data = (float*)calloc(A->shape[0] * A->shape[1], sizeof(float));
 
     for (int i = 0; i < A->shape[0]; i++)
     {
@@ -111,7 +111,7 @@ double norm(ndarray* X)
     return sqrt(norm);
 }
 
-void normalize(ndarray* X, double nrm)
+void normalize(ndarray* X, float nrm)
 {   
     for(int i = 0; i < X->shape[0] * X->shape[1]; i++)
     {
