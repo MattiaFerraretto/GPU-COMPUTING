@@ -366,6 +366,76 @@ __host__ ndarray* cudaVSDivision(ndarray* A, float value, bool A_devFree, bool C
     return toHost(C_dev, C_devFree);
 }
 
+__global__ void cudaMMProduct(ndarray A, ndarray B, ndarray C)
+{
+    int i = blockDim.y * blockIdx.y + threadIdx.y;
+    int j = blockDim.x * blockIdx.x + threadIdx.x;
+
+    __shared__ int aRws, aCls, bRws, bCls, cRws, cCls;
+    __shared__ float A_tile[BLOCKDIMX][BLOCKDIMY];
+    __shared__ float B_tile[BLOCKDIMX][BLOCKDIMY];
+
+    if(threadIdx.x == 0 && threadIdx.y == 0)
+    {   
+        aRws = A.shape[0];
+        aCls = A.shape[1];
+        bRws = B.shape[0];
+        bCls = B.shape[1];
+        cRws = C.shape[0];
+        cCls = C.shape[1];
+    }
+    __syncthreads();
+
+
+    float sum = 0.f;
+    for(int block = 0; block < gridDim.x; block++)
+    {
+
+        if(i <  aRws && j < aCls)
+            A_tile[threadIdx.y][threadIdx.x] = A.data[aCls * i + blockDim.x * block + j];
+
+        if(i < bRws && j < bCls)
+            B_tile[threadIdx.y][threadIdx.x] = B.data[bCls * i + blockDim.y * bCls * block + j];
+        
+        __syncthreads();
+
+
+        //TODO LOOP UNROLLING AND TUNING LAST BLOCK
+        for(int k = 0; k < blockDim.x; k++)
+        {
+            sum += A_tile[threadIdx.y][k] * B_tile[k][threadIdx.x];
+        }
+        __syncthreads();
+    }
+
+    if(i < cRws && j < cCls)
+        C.data[cCls * i + j] = sum;
+}
+
+__host__ ndarray* cudaMMProduct(ndarray* A, ndarray* B)
+{
+    ndarray* A_dev = toDevice(A, false);
+    ndarray* B_dev = toDevice(B, false);
+    ndarray* C_dev = cuda_ndarray(A->shape[0], B->shape[1], 0);
+
+    dim3 block(BLOCKDIMX, BLOCKDIMY);
+
+    int gridx = (A->shape[1] + block.x - 1) / block.x;
+    int gridy = (B->shape[0] + block.y - 1) / block.y;
+    dim3 grid(gridx, gridy);
+
+
+    printf("grid: (%d, %d); blockSize: (%d, %d)\n", grid.x, grid.y, block.x, block.y);
+
+    cudaMMProduct <<< grid, block >>>(*A_dev, *B_dev, *C_dev);
+    CUDA_CHECK(cudaDeviceSynchronize());
+
+    cudaFree_(A_dev);
+    cudaFree_(B_dev);
+
+    return toHost(C_dev, true);
+}
+
 void init(ndarray* A)
 {
     srand(time(NULL));
@@ -373,32 +443,37 @@ void init(ndarray* A)
     for(int i = 0; i < A->shape[0] * A->shape[1]; i++)
     {
         //A->data[i] = (double)rand() / (double)RAND_MAX;
-        A->data[i] = 10;
+        A->data[i] = 1;
     }
 }
 
 int main(){
 
-    ndarray* A = new_ndarray(10,20, NULL);
-    init(A);
+    float d[8] = {1, 2, 2, 1, 3, 4, 4, 3};
+    ndarray* A = new_ndarray(4,2, d);
+    //init(A);
 
-    //ndarray* B = new_ndarray(1,20, NULL);
+    //ndarray* B = new_ndarray(5,5, NULL);
     //init(B);
 
-    //ndarray* AT = cudaMTranspose(A, true, true);
+    ndarray* AT = cudaMTranspose(A, true, true);
    
 
-    ndarray* C = cudaMSub(A, A, true, true, true);
+    //ndarray* C = cudaMSub(A, A, true, true, true);
 
     //ndarray* C = cudaMatScalarProduct(A, 2, true, true);
 
     //double nrm = cudaEDistance(A, B, true, true);
     //printf("%2f\n", nrm);
 
-    //ndarray* C = cudaVSDivision(A, nrm, true, true);
+    //ndarray* C = cudaVSDivision(A, 2, true, true);
     //print(A);
+
+    ndarray* C = cudaMMProduct(AT, A);
+    
+    print(A);
+    print(AT);
     print(C);
-    //print(AT);
 
     
 
