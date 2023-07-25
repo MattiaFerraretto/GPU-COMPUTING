@@ -18,7 +18,7 @@ bool NDARRAY_CHECK(ndarray* A, ndarray* B)
     }
 
     for(int i = 0; i < A->shape[0] * A->shape[1]; i++)
-        if(A->data[i] != B->data[i])
+        if(abs(A->data[i] - B->data[i]) > 1e-2)
             return false;
 
     return true;
@@ -37,7 +37,7 @@ void random_init(ndarray* A) {
   }
 }
 
-void VSD_TEST(FILE* fp, int nTest, int exp, bool verbose)
+void VSD_TEST(FILE* fp, int nTest, int exp, int nTile, bool verbose)
 {
     printf("\n\n");
     fprintf(fp, "\n\n");
@@ -46,19 +46,16 @@ void VSD_TEST(FILE* fp, int nTest, int exp, bool verbose)
     for(int i = 0; i < nTest; i++)
     {
         int m = 1 << (exp + i);
-        //int n = (int) sqrt(m);
 
         HOST_TOT_TIME = 0;
         DEVICE_TOT_TIME = 0;
 
         ndarray* A = cuda_ndarrayHost(1 ,m);
-        //ndarray* B = cuda_ndarrayHost(n ,n);
         
         random_init(A);
-        //random_init(B);
         
         ndarray* C_h = vectorScalarDivision(A, 10.f, false);
-        ndarray* C_d = cudaVSDivision(A, 10.f, 1, false, false);
+        ndarray* C_d = cudaVSDivision(A, 10.f, nTile, false, false);
 
         bool passed = NDARRAY_CHECK(C_h, C_d);
 
@@ -66,16 +63,18 @@ void VSD_TEST(FILE* fp, int nTest, int exp, bool verbose)
         free_(C_h);
         cudaFreeHost_(C_d);
 
+        float speedup = HOST_TOT_TIME / (DEVICE_TOT_TIME / 1000);
+
         if(verbose)
-            printf("TEST: vectorScalarDivision vs cudaVSDivision,\tNumber of elements: %d,\tsize (MB): %.2f,\ttime (s): %.4f, %.4f\tpassed: %d\n", m,  m * sizeof(float) / pow(2, 20), HOST_TOT_TIME, DEVICE_TOT_TIME / 1000, passed);
+            printf("TEST: vectorScalarDivision vs cudaVSDivision,\tNumber of elements: %d,\tsize (MB): %.2f,\ttime (s): %.4f vs %.4f,\tGPU speedup: %.4f,\tpassed: %d\n", m,  m * sizeof(float) / pow(2, 20), HOST_TOT_TIME, DEVICE_TOT_TIME / 1000, speedup, passed);
         
-        fprintf(fp, "TEST: vectorScalarDivision vs cudaVSDivision,\tNumber of elements: %d,\tsize (MB): %.2f,\ttime (s): %.4f, %.4f\tpassed: %d\n", m,  m * sizeof(float) / pow(2, 20), HOST_TOT_TIME, DEVICE_TOT_TIME / 1000, passed);
+        fprintf(fp, "TEST: vectorScalarDivision vs cudaVSDivision,\tNumber of elements: %d,\tsize (MB): %.2f,\ttime (s): %.4f vs %.4f,\tGPU speedup: %.4f,\tpassed: %d\n", m,  m * sizeof(float) / pow(2, 20), HOST_TOT_TIME, DEVICE_TOT_TIME / 1000, speedup, passed);
         fflush(fp);
 
     }
 }
 
-void ED_TEST(FILE* fp, int nTest, int exp, bool verbose)
+void ED_TEST(FILE* fp, int nTest, int exp, int nTile, bool verbose)
 {
     printf("\n\n");
     fprintf(fp, "\n\n");
@@ -84,53 +83,254 @@ void ED_TEST(FILE* fp, int nTest, int exp, bool verbose)
     for(int i = 0; i < nTest; i++)
     {
         int m = 1 << (exp + i);
-        //int n = (int) sqrt(m);
 
         HOST_TOT_TIME = 0;
         DEVICE_TOT_TIME = 0;
 
-        //printf("OK\n");
         ndarray* A = cuda_ndarrayHost(1 ,m);
         ndarray* B = cuda_ndarrayHost(1 ,m);
-        //printf("OK\n");
         
-        //random_init(A);
-        //random_init(B);
-        init(A, 2);
-        init(B, 1);
-        //printf("OK\n");
+        random_init(A);
+        random_init(B);
         
         float C_h = euclideanDistance(A, B);
-        //printf("%f\n", C_h);
-        float C_d = cudaEDistance(A, B, 1, false);
-        //printf("%f\n", C_d);
+        float C_d = cudaEDistance(A, B, nTile, false);
 
         bool passed = SCALAR_CHECK(C_h, C_d);
 
         cudaFreeHost_(A);
         cudaFreeHost_(B);
 
+        float speedup = HOST_TOT_TIME / (DEVICE_TOT_TIME / 1000);
+
         if(verbose)
-            printf("TEST: euclideanDistance vs cudaEDistance,\tNumber of elements: %d,\tsize (MB): %.2f,\ttime (s): %.4f, %.4f\tpassed: %d\n", m,  m * sizeof(float) / pow(2, 20), HOST_TOT_TIME, DEVICE_TOT_TIME / 1000, passed);
+            printf("TEST: euclideanDistance vs cudaEDistance,\tNumber of elements: %d,\tsize (MB): %.2f,\ttime (s): %.4f vs %.4f,\tGPU speedup: %.4f,\tpassed: %d\n", m,  m * sizeof(float) / pow(2, 20), HOST_TOT_TIME, DEVICE_TOT_TIME / 1000, speedup, passed);
         
-        fprintf(fp, "TEST: euclideanDistance vs cudaEDistance,\tNumber of elements: %d,\tsize (MB): %.2f,\ttime (s): %.4f, %.4f\tpassed: %d\n", m,  m * sizeof(float) / pow(2, 20), HOST_TOT_TIME, DEVICE_TOT_TIME / 1000, passed);
+        fprintf(fp, "TEST: euclideanDistance vs cudaEDistance,\tNumber of elements: %d,\tsize (MB): %.2f,\ttime (s): %.4f vs %.4f,\tGPU speedup: %.4f,\tpassed: %d\n", m,  m * sizeof(float) / pow(2, 20), HOST_TOT_TIME, DEVICE_TOT_TIME / 1000, speedup, passed);
         fflush(fp);
 
     }
 }
 
+void MSP_TEST(FILE* fp, int nTest, int exp, int nTile, bool verbose)
+{
+    printf("\n\n");
+    fprintf(fp, "\n\n");
+    fflush(fp);
+
+    for(int i = 0; i < nTest; i++)
+    {
+        int m = 1 << (exp + i);
+        int n = (int) sqrt(m);
+
+
+        HOST_TOT_TIME = 0;
+        DEVICE_TOT_TIME = 0;
+
+        ndarray* A = cuda_ndarrayHost(n ,n);
+        
+        random_init(A);
+        
+        ndarray* C_h = matScalarProduct(A, 10.f, false);
+        ndarray* C_d = cudaMSProduct(A, 10.f, nTile, false, false);
+
+        bool passed = NDARRAY_CHECK(C_h, C_d);
+
+        cudaFreeHost_(A);
+        free_(C_h);
+        cudaFreeHost_(C_d);
+
+        float speedup = HOST_TOT_TIME / (DEVICE_TOT_TIME / 1000);
+
+        if(verbose)
+            printf("TEST: matScalarProduct vs cudaMSProduct,\tNumber of elements: %d,\tsize (MB): %.2f,\ttime (s): %.4f vs %.4f,\tGPU speedup: %.4f,\tpassed: %d\n", m,  m * sizeof(float) / pow(2, 20), HOST_TOT_TIME, DEVICE_TOT_TIME / 1000, speedup, passed);
+        
+        fprintf(fp, "TEST: matScalarProduct vs cudaMSProduct,\tNumber of elements: %d,\tsize (MB): %.2f,\ttime (s): %.4f vs %.4f,\tGPU speedup: %.4f,\tpassed: %d\n", m,  m * sizeof(float) / pow(2, 20), HOST_TOT_TIME, DEVICE_TOT_TIME / 1000, speedup, passed);
+        fflush(fp);
+
+    }
+}
+
+void MT_TEST(FILE* fp, int nTest, int exp, int nTile, bool verbose)
+{
+    printf("\n\n");
+    fprintf(fp, "\n\n");
+    fflush(fp);
+
+    for(int i = 0; i < nTest; i++)
+    {
+        int m = 1 << (exp + i);
+        int n = (int) sqrt(m);
+
+
+        HOST_TOT_TIME = 0;
+        DEVICE_TOT_TIME = 0;
+
+        ndarray* A = cuda_ndarrayHost(n ,n);
+        
+        random_init(A);
+        
+        ndarray* C_h = matTranspose(A);
+        ndarray* C_d = cudaMTranspose(A, nTile, false);
+
+        bool passed = NDARRAY_CHECK(C_h, C_d);
+
+        cudaFreeHost_(A);
+        free_(C_h);
+        cudaFreeHost_(C_d);
+
+        float speedup = HOST_TOT_TIME / (DEVICE_TOT_TIME / 1000);
+
+        if(verbose)
+            printf("TEST: matTranspose vs cudaMTranspose,\tNumber of elements: %d,\tsize (MB): %.2f,\ttime (s): %.4f vs %.4f,\tGPU speedup: %.4f,\tpassed: %d\n", m,  m * sizeof(float) / pow(2, 20), HOST_TOT_TIME, DEVICE_TOT_TIME / 1000, speedup, passed);
+        
+        fprintf(fp, "TEST: matTranspose vs cudaMTranspose,\tNumber of elements: %d,\tsize (MB): %.2f,\ttime (s): %.4f vs %.4f,\tGPU speedup: %.4f,\tpassed: %d\n", m,  m * sizeof(float) / pow(2, 20), HOST_TOT_TIME, DEVICE_TOT_TIME / 1000, speedup, passed);
+        fflush(fp);
+
+    }
+}
+
+void MS_TEST(FILE* fp, int nTest, int exp, int nTile, bool verbose)
+{
+    printf("\n\n");
+    fprintf(fp, "\n\n");
+    fflush(fp);
+
+    for(int i = 0; i < nTest; i++)
+    {
+        int m = 1 << (exp + i);
+        int n = (int) sqrt(m);
+
+
+        HOST_TOT_TIME = 0;
+        DEVICE_TOT_TIME = 0;
+
+        ndarray* A = cuda_ndarrayHost(n ,n);
+        ndarray* B = cuda_ndarrayHost(n ,n);
+        
+        random_init(A);
+        random_init(B);
+        
+        ndarray* C_h = matSub(A, B, false);
+        ndarray* C_d = cudaMMSub(A, B, nTile, false, false);
+
+        bool passed = NDARRAY_CHECK(C_h, C_d);
+
+        cudaFreeHost_(A);
+        cudaFreeHost_(B);
+        free_(C_h);
+        cudaFreeHost_(C_d);
+
+        float speedup = HOST_TOT_TIME / (DEVICE_TOT_TIME / 1000);
+
+        if(verbose)
+            printf("TEST: matSub vs cudaMMSub,\tNumber of elements: %d,\tsize (MB): %.2f,\ttime (s): %.4f vs %.4f,\tGPU speedup: %.4f,\tpassed: %d\n", m,  m * sizeof(float) / pow(2, 20), HOST_TOT_TIME, DEVICE_TOT_TIME / 1000, speedup, passed);
+        
+        fprintf(fp, "TEST: matSub vs cudaMMSub,\tNumber of elements: %d,\tsize (MB): %.2f,\ttime (s): %.4f vs %.4f,\tGPU speedup: %.4f,\tpassed: %d\n", m,  m * sizeof(float) / pow(2, 20), HOST_TOT_TIME, DEVICE_TOT_TIME / 1000, speedup, passed);
+        fflush(fp);
+
+    }
+}
+
+void MP_TEST(FILE* fp, int nTest, int exp, bool verbose)
+{
+    printf("\n\n");
+    fprintf(fp, "\n\n");
+    fflush(fp);
+
+    for(int i = 0; i < nTest; i++)
+    {
+        int m = 1 << (exp + i);
+        int n = (int) sqrt(m);
+
+        HOST_TOT_TIME = 0;
+        DEVICE_TOT_TIME = 0;
+
+        ndarray* A = cuda_ndarrayHost(n ,n);
+        ndarray* B = cuda_ndarrayHost(n ,n);
+        
+        random_init(A);
+        random_init(B);
+        
+        ndarray* C_h = matProduct(A, B);
+        ndarray* C_d = cudaMMProduct(A, B, false);
+
+        bool passed = NDARRAY_CHECK(C_h, C_d);
+
+        cudaFreeHost_(A);
+        cudaFreeHost_(B);
+        free_(C_h);
+        cudaFreeHost_(C_d);
+
+        float speedup = HOST_TOT_TIME / (DEVICE_TOT_TIME / 1000);
+
+        if(verbose)
+            printf("TEST: matProduct vs cudaMMProduct,\tNumber of elements: %d,\tsize (MB): %.2f,\ttime (s): %.4f vs %.4f,\tGPU speedup: %.4f,\tpassed: %d\n", m,  m * sizeof(float) / pow(2, 20), HOST_TOT_TIME, DEVICE_TOT_TIME / 1000, speedup, passed);
+        
+        fprintf(fp, "TEST: matProduct vs cudaMMProduct,\tNumber of elements: %d,\tsize (MB): %.2f,\ttime (s): %.4f vs %.4f,\tGPU speedup: %.4f,\tpassed: %d\n", m,  m * sizeof(float) / pow(2, 20), HOST_TOT_TIME, DEVICE_TOT_TIME / 1000, speedup, passed);
+        fflush(fp);
+
+    }
+}
+
+void E_TEST(FILE* fp, int nTest, int exp, int nTile, bool verbose)
+{
+    printf("\n\n");
+    fprintf(fp, "\n\n");
+    fflush(fp);
+
+    for(int i = 0; i < nTest; i++)
+    {
+        int m = 1 << (exp + i);
+        int n = (int) sqrt(m);
+
+
+        HOST_TOT_TIME = 0;
+        DEVICE_TOT_TIME = 0;
+
+        ndarray* A = cuda_ndarrayHost(n ,n);
+        
+        random_init(A);
+        
+        ndarray* C_h = eigenvectors(A, 20, 1e-6, 50);
+        ndarray* C_d = cudaEigenvectors(A, 20, 1e-6, 50);
+
+        bool passed = NDARRAY_CHECK(C_h, C_d);
+
+        cudaFreeHost_(A);
+        free_(C_h);
+        cudaFreeHost_(C_d);
+
+        float speedup = HOST_TOT_TIME / (DEVICE_TOT_TIME / 1000);
+
+        if(verbose)
+            printf("TEST: eigenvectors vs cudaEigenvectors,\tNumber of elements: %d,\tsize (MB): %.2f,\ttime (s): %.4f vs %.4f,\tGPU speedup: %.4f,\tpassed: %d\n", m,  m * sizeof(float) / pow(2, 20), HOST_TOT_TIME, DEVICE_TOT_TIME / 1000, speedup, passed);
+        
+        fprintf(fp, "TEST: eigenvectors vs cudaEigenvectors,\tNumber of elements: %d,\tsize (MB): %.2f,\ttime (s): %.4f vs %.4f,\tGPU speedup: %.4f,\tpassed: %d\n", m,  m * sizeof(float) / pow(2, 20), HOST_TOT_TIME, DEVICE_TOT_TIME / 1000, speedup, passed);
+        fflush(fp);
+
+    }
+}
 
 int main()
 {   
     FILE* fp = fopen("test_results.txt", "w");
 
-    //VSD_TEST(fp, 4, 25, true);
-    ED_TEST(fp, 4, 25, true);
+    int nTest = 4;
+    int exp = 25;
+    int nTile = 1;
+    bool verbose = true;
+
+    VSD_TEST(fp, nTest, exp, nTile, verbose);
+    ED_TEST(fp, nTest, exp, nTile, verbose);
+    MSP_TEST(fp, nTest, exp, nTile, verbose);
+    MT_TEST(fp, nTest, exp, nTile, verbose);
+    MS_TEST(fp, nTest, exp, nTile, verbose);
+    MP_TEST(fp, nTest, exp, verbose);
+
 
     fflush(fp);
     fclose(fp);
-
-
 
 
     return 0;

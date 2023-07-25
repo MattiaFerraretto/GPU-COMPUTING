@@ -155,13 +155,13 @@ float euclideanDistance(ndarray* A, ndarray* B)
         exit(EXIT_FAILURE); 
     }
 
-    float distance = 0;
+    double distance = 0.f;
     clock_t start, end;
 
     start = clock();
     for(int i = 0; i < A->shape[0] * A->shape[1]; i++)
     {   
-        distance += pow(A->data[i] - B->data[i], 2);
+        distance += (A->data[i] - B->data[i]) * (A->data[i] - B->data[i]);
     }
     end = clock();
 

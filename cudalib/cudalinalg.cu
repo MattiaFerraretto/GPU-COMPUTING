@@ -277,7 +277,7 @@ __global__ void cudaEDistance(ndarray A, ndarray B, ndarray C, int offset, int d
     }
     __syncthreads();
 
-    As[tid] = powf(As[tid] - Bs[tid], 2.f);
+    As[tid] = (As[tid] - Bs[tid]) * (As[tid] - Bs[tid]);
     __syncthreads();
 
     for(int stride = blockDim.x / 2; stride > 0; stride >>= 1)
@@ -401,7 +401,7 @@ __host__ float cudaEDistance(ndarray* A, ndarray* B, int nTile, bool verbose)
     free(startEvents);
     free(stopEvents);
 
-    float distance = 0.f;
+    double distance = 0.f;
     for(int i = 0; i < C->shape[1]; i++)
     {
         distance += C->data[i];

@@ -9,6 +9,9 @@
 float HOST_TOT_TIME = 0;
 float DEVICE_TOT_TIME = 0;
 
+/**
+ * Host PCA version
+*/
 ndarray* PCA(ndarray* M, int k)
 {
     ndarray* MT = matTranspose(M);
@@ -24,6 +27,9 @@ ndarray* PCA(ndarray* M, int k)
     return mpca;
 }
 
+/**
+ * Cuda PCA version
+*/
 ndarray* cudaPCA(ndarray* M, int k)
 {
     ndarray* MT = cudaMTranspose(M, 1, false);
@@ -39,85 +45,72 @@ ndarray* cudaPCA(ndarray* M, int k)
     return mpca;
 }
 
-void test1(){
+void from_file_example(){
 
-    ndarray* M = new_ndarray(4, 2);
+    ndarray* M = new_ndarray(569, 30);
 
-    M->data[0] = 1;
-    M->data[1] = 2; 
-    M->data[2] = 2; 
-    M->data[3] = 1; 
-    M->data[4] = 3; 
-    M->data[5] = 4; 
-    M->data[6] = 4; 
-    M->data[7] = 3; 
+    csv2ndarry(M, "./DATA/breast_cancer.csv", ",");
 
-    //ndarray* Mpca = PCA(M, 1);
+    printShape(M);
 
-    //print(Mpca);
+    ndarray* Mpca = PCA(M, 15);
+    printShape(Mpca);
+
+    ndarray2csv("out.csv", Mpca, ",");
 }
 
-void test2(){
-
-    //ndarray* data = csv2ndarry("./DATA/breast_cancer.csv", 569, 30, ",");
-    //printShape(data);
-
-    ndarray* data = new_ndarray(569, 30);
-
-    csv2ndarry(data, "./DATA/breast_cancer.csv", ",");
-
-    printShape(data);
-
-   // ndarray* Mpca = PCA(data, 5);
-    //printShape(Mpca);
-
-    //ndarray2csv("out.csv", Mpca, ",");
-
-    ndarray2csv("out.csv", data, ",");
-}
-
-void initTest(ndarray* test){
-    test->data[0] = 3;
-    test->data[1] = 2;
-    test->data[2] = 2;
-    test->data[3] = 6;
-}
-
-void random_init(ndarray* A) {
-  
+/**
+ * Random initializer for tests
+*/
+void random_init(ndarray* A)
+{
   for (int i = 0; i < A->shape[0] * A->shape[1]; i++) 
   {
     A->data[i] = (float)rand() / RAND_MAX;
   }
+}
 
-  printf("ARRAY INIT!!\n");
+/**
+ * PCA test
+*/
+bool PCA_TEST(ndarray* A, ndarray* B)
+{
+    if(A->shape[0] != B->shape[0] || A->shape[1] != B->shape[1])
+    {
+        printf("ERROR:: File: %s, Line: %d, Function name: NDARRAY_CHECK, ", __FILE__, __LINE__);
+        printf("reason: %d != %d || %d != %d; A and B must have the same size.\n", A->shape[0], B->shape[0], A->shape[1], B->shape[1]);
+        exit(EXIT_FAILURE); 
+    }
+
+    for(int i = 0; i < A->shape[0] * A->shape[1]; i++)
+        if(abs(A->data[i] - B->data[i]) > 1e-2)
+            return false;
+
+    return true;
 }
 
 int main(){
 
     int m = 1 << 25;
 
-    printf("m: %d, MB: %f\n", m,  m * sizeof(float) / pow(2, 20));
-
     int n = (int) sqrt(m);
-    printf("%d\n", n);
 
     ndarray* M = cuda_ndarrayHost(n, n);
-    //csv2ndarry(M, "./DATA/breast_cancer.csv", ",");
-    //initTest(M);
+   
     random_init(M);
-    //print(M);
 
-    ndarray* pca = PCA(M, 15);
-    //print(pca);
-    printf("Host total time: %.10f\n", HOST_TOT_TIME);
+    ndarray* pca = PCA(M, 20);
+    ndarray* cuda_pca = cudaPCA(M, 20);
 
-    printf("--------------- CUDA RESULTS ---------------\n");
+    bool passed = PCA_TEST(pca, cuda_pca);
 
-    ndarray* cuda_pca = cudaPCA(M, 15);
-    //print(cuda_pca);
+    cudaFreeHost_(M);
+    free_(pca);
+    cudaFreeHost_(cuda_pca);
 
-    printf("Device total time: %.10f\n", DEVICE_TOT_TIME / 1000);
+    float speedup = HOST_TOT_TIME / (DEVICE_TOT_TIME / 1000);
+
+    printf("TEST: PCA vs cudaPCA,\tNumber of elements: %d,\tsize (MB): %.2f,\ttime (s): %.4f vs %.4f, \tGPU speedup: %.4f,\tpassed: %d\n", m,  m * sizeof(float) / pow(2, 20), HOST_TOT_TIME, DEVICE_TOT_TIME / 1000, speedup, passed);
     
 
     return 0;
