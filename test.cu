@@ -8,6 +8,9 @@
 float HOST_TOT_TIME = 0;
 float DEVICE_TOT_TIME = 0;
 
+/**
+ * NDARRAY_CHECK function checks if two n-dimensional array are equal with a tollerance error of 1e-2
+*/
 bool NDARRAY_CHECK(ndarray* A, ndarray* B)
 {
     if(A->shape[0] != B->shape[0] || A->shape[1] != B->shape[1])
@@ -20,23 +23,35 @@ bool NDARRAY_CHECK(ndarray* A, ndarray* B)
     for(int i = 0; i < A->shape[0] * A->shape[1]; i++)
         if(abs(A->data[i] - B->data[i]) > 1e-2)
             return false;
+        
 
     return true;
 }
 
+/**
+ * SCALAR_CHECK function checks if two scalar are equals
+*/
 bool SCALAR_CHECK(float a, float b)
 {
     return a == b;
 }
 
-void random_init(ndarray* A) {
-  
-  for (int i = 0; i < A->shape[0] * A->shape[1]; i++) 
-  {
-    A->data[i] = (float)rand() / RAND_MAX;
-  }
+/**
+ * random_init function initializes randomly a n-dimensional array
+*/
+void random_init(ndarray* A) 
+{
+    srand(time(NULL));
+
+    for (int i = 0; i < A->shape[0] * A->shape[1]; i++) 
+    {
+        A->data[i] = (float)rand() / RAND_MAX;
+    }
 }
 
+/**
+ * Vector scalar division test
+*/
 void VSD_TEST(FILE* fp, int nTest, int exp, int nTile, bool verbose)
 {
     printf("\n\n");
@@ -74,6 +89,9 @@ void VSD_TEST(FILE* fp, int nTest, int exp, int nTile, bool verbose)
     }
 }
 
+/**
+ * Eclidean distance test
+*/
 void ED_TEST(FILE* fp, int nTest, int exp, int nTile, bool verbose)
 {
     printf("\n\n");
@@ -112,6 +130,9 @@ void ED_TEST(FILE* fp, int nTest, int exp, int nTile, bool verbose)
     }
 }
 
+/**
+ * Matrix scalr product test 
+*/
 void MSP_TEST(FILE* fp, int nTest, int exp, int nTile, bool verbose)
 {
     printf("\n\n");
@@ -151,6 +172,9 @@ void MSP_TEST(FILE* fp, int nTest, int exp, int nTile, bool verbose)
     }
 }
 
+/**
+ * Matrix transpose test
+*/
 void MT_TEST(FILE* fp, int nTest, int exp, int nTile, bool verbose)
 {
     printf("\n\n");
@@ -190,6 +214,9 @@ void MT_TEST(FILE* fp, int nTest, int exp, int nTile, bool verbose)
     }
 }
 
+/**
+ * Matrix subtraction test
+*/
 void MS_TEST(FILE* fp, int nTest, int exp, int nTile, bool verbose)
 {
     printf("\n\n");
@@ -232,6 +259,9 @@ void MS_TEST(FILE* fp, int nTest, int exp, int nTile, bool verbose)
     }
 }
 
+/**
+ * Matrix product test
+*/
 void MP_TEST(FILE* fp, int nTest, int exp, bool verbose)
 {
     printf("\n\n");
@@ -273,6 +303,9 @@ void MP_TEST(FILE* fp, int nTest, int exp, bool verbose)
     }
 }
 
+/**
+ * Eigenvectors test
+*/
 void E_TEST(FILE* fp, int nTest, int exp, int nTile, bool verbose)
 {
     printf("\n\n");
@@ -288,16 +321,16 @@ void E_TEST(FILE* fp, int nTest, int exp, int nTile, bool verbose)
         HOST_TOT_TIME = 0;
         DEVICE_TOT_TIME = 0;
 
-        ndarray* A = cuda_ndarrayHost(n ,n);
+        ndarray* A_h = cuda_ndarrayHost(n ,n);
         
-        random_init(A);
+        random_init(A_h);
         
-        ndarray* C_h = eigenvectors(A, 20, 1e-6, 50);
-        ndarray* C_d = cudaEigenvectors(A, 20, 1e-6, 50);
+        ndarray* C_h = eigenvectors(A_h, 20, 1e-6, 50);
+        ndarray* C_d = cudaEigenvectors(A_h, 20, 1e-6, 50);
 
         bool passed = NDARRAY_CHECK(C_h, C_d);
 
-        cudaFreeHost_(A);
+        cudaFreeHost_(A_h);
         free_(C_h);
         cudaFreeHost_(C_d);
 
@@ -317,7 +350,7 @@ int main()
     FILE* fp = fopen("test_results.txt", "w");
 
     int nTest = 4;
-    int exp = 25;
+    int exp = 24;
     int nTile = 1;
     bool verbose = true;
 
@@ -327,7 +360,7 @@ int main()
     MT_TEST(fp, nTest, exp, nTile, verbose);
     MS_TEST(fp, nTest, exp, nTile, verbose);
     MP_TEST(fp, nTest, exp, verbose);
-
+    E_TEST(fp, nTest, exp, nTile, verbose);
 
     fflush(fp);
     fclose(fp);

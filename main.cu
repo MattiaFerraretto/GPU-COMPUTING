@@ -64,10 +64,12 @@ void from_file_example(){
 */
 void random_init(ndarray* A)
 {
-  for (int i = 0; i < A->shape[0] * A->shape[1]; i++) 
-  {
-    A->data[i] = (float)rand() / RAND_MAX;
-  }
+    srand(time(NULL));
+
+    for (int i = 0; i < A->shape[0] * A->shape[1]; i++) 
+    {
+        A->data[i] = (float)rand() / RAND_MAX;
+    }
 }
 
 /**
@@ -77,7 +79,7 @@ bool PCA_TEST(ndarray* A, ndarray* B)
 {
     if(A->shape[0] != B->shape[0] || A->shape[1] != B->shape[1])
     {
-        printf("ERROR:: File: %s, Line: %d, Function name: NDARRAY_CHECK, ", __FILE__, __LINE__);
+        printf("ERROR:: File: %s, Line: %d, Function name: PCA_TEST, ", __FILE__, __LINE__);
         printf("reason: %d != %d || %d != %d; A and B must have the same size.\n", A->shape[0], B->shape[0], A->shape[1], B->shape[1]);
         exit(EXIT_FAILURE); 
     }
@@ -91,7 +93,7 @@ bool PCA_TEST(ndarray* A, ndarray* B)
 
 int main(){
 
-    int m = 1 << 25;
+    int m = 1 << 27;
 
     int n = (int) sqrt(m);
 
@@ -103,7 +105,7 @@ int main(){
     ndarray* cuda_pca = cudaPCA(M, 20);
 
     bool passed = PCA_TEST(pca, cuda_pca);
-
+    
     cudaFreeHost_(M);
     free_(pca);
     cudaFreeHost_(cuda_pca);

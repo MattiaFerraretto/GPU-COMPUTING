@@ -392,7 +392,7 @@ __host__ ndarray* cudaMMProduct(ndarray* A, ndarray* B, bool verbose);
  * 
  * Parameters
  * ----------
- * A        : pointer to the host 2-dimensional array
+ * M        : pointer to the host 2-dimensional array
  * k        : Number of eingenvectors to be computed
  * tol      : convergence tolerance
  * MAXITER  : Number of maximum iterations
@@ -402,7 +402,7 @@ __host__ ndarray* cudaMMProduct(ndarray* A, ndarray* B, bool verbose);
  * The function returns the pointer to the host 2-dimensional array containing the k largest eigenvectors.
  * A column matrix is returned.
 */
-__host__ ndarray* cudaEigenvectors(ndarray* A, int k, float tol, int MAXITER);
+__host__ ndarray* cudaEigenvectors(ndarray* M, int k, float tol, int MAXITER);
 
 
 #endif

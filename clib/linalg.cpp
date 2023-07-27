@@ -173,14 +173,17 @@ float euclideanDistance(ndarray* A, ndarray* B)
 /**
  * See the documentation of eigenvectors function in the file linalg.h 
 */
-ndarray* eigenvectors(ndarray* A, int k, float tol, int MAX_ITER)
+ndarray* eigenvectors(ndarray* M, int k, float tol, int MAX_ITER)
 {
-    if(k > A->shape[1])
+    if(k > M->shape[1])
     {
         printf("ERROR:: File: %s, Line: %d, Function name: eigenvectors, ", __FILE__, __LINE__);
-        printf("reason: %d > %d; The numbers of eigenvectors (k) must be at most equals to the rank of the matrix.\n", k, A->shape[1]);
+        printf("reason: %d > %d; The numbers of eigenvectors (k) must be at most equals to the rank of the matrix.\n", k, M->shape[1]);
         exit(EXIT_FAILURE); 
     }
+
+    ndarray* A = new_ndarray(M->shape[0], M->shape[1]);
+    memcpy((void*)A->data, (void*)M->data,  M->shape[0] * M->shape[1] * sizeof(float));
 
     ndarray* E = new_ndarray(k, A->shape[1]);
     ndarray* O = new_ndarray(A->shape[1], 1);
@@ -208,7 +211,7 @@ ndarray* eigenvectors(ndarray* A, int k, float tol, int MAX_ITER)
 
             x = eigvc;
 
-        }while(sqrterr > tol && iter++ < MAX_ITER);
+        }while(sqrterr > tol && ++iter < MAX_ITER);
 
         memcpy((void*)&E->data[i * A->shape[1]], (void*)eigvc->data, eigvc->shape[0] * sizeof(float));
 

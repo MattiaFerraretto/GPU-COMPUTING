@@ -118,7 +118,7 @@ ndarray* matProduct(ndarray* A, ndarray* B);
  * 
  * Parameters
  * ----------
- * A        : pointer to the host 2-dimensional array
+ * M        : pointer to the host 2-dimensional array
  * k        : Number of eingenvectors to be computed
  * tol      : convergence tolerance
  * MAXITER  : Number of maximum iterations
@@ -128,6 +128,6 @@ ndarray* matProduct(ndarray* A, ndarray* B);
  * The function returns the pointer to the 2-dimensional array containing the k largest eigenvectors.
  * A column matrix is returned.
 */
-ndarray* eigenvectors(ndarray* A, int k, float tol, int MAXITER);
+ndarray* eigenvectors(ndarray* M, int k, float tol, int MAXITER);
 
 #endif

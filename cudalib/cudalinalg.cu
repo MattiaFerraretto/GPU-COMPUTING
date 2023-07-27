@@ -899,14 +899,17 @@ __host__ ndarray* cudaMMProduct(ndarray* A, ndarray* B, bool verbose)
 /**
  * See the documentation of eigenvectors function in the file cudalinalg.cuh 
 */
-__host__ ndarray* cudaEigenvectors(ndarray* A, int k, float tol, int MAXITER)
+__host__ ndarray* cudaEigenvectors(ndarray* M, int k, float tol, int MAXITER)
 {
-    if(k > A->shape[1])
+    if(k > M->shape[1])
     {
         printf("ERROR:: File: %s, Line: %d, Function name: eigenvectors, ", __FILE__, __LINE__);
-        printf("reason: %d > %d; The numbers of eigenvectors (k) must be at most equals to the rank of the matrix.\n", k, A->shape[1]);
+        printf("reason: %d > %d; The numbers of eigenvectors (k) must be at most equals to the rank of the matrix.\n", k, M->shape[1]);
         exit(EXIT_FAILURE); 
     }
+
+    ndarray* A = cuda_ndarrayHost(M->shape[0], M->shape[1]);
+    memcpy((void*)A->data, (void*)M->data,  M->shape[0] * M->shape[1] * sizeof(float));
   
     ndarray* E = cuda_ndarrayHost(k, A->shape[1]);
     ndarray* O = cuda_ndarrayHost(A->shape[1], 1);
@@ -932,7 +935,8 @@ __host__ ndarray* cudaEigenvectors(ndarray* A, int k, float tol, int MAXITER)
             cudaFreeHost_(x);
 
             x = eigvc;
-        }while(sqrterr > tol && iter++ < MAXITER);
+
+        }while(sqrterr > tol && ++iter < MAXITER);
 
         memcpy((void*)&E->data[i * A->shape[1]], (void*)eigvc->data, eigvc->shape[0] * sizeof(float));
 
@@ -960,50 +964,3 @@ __host__ ndarray* cudaEigenvectors(ndarray* A, int k, float tol, int MAXITER)
 
     return ET;
 }
-
-/*void initCOV(ndarray* COV){
-    COV->data[0] = 3;
-    COV->data[1] = 2;
-    COV->data[2] = 2;
-    COV->data[3] = 6;
-}
-
-int main(){
-
-    //float d[8] = {1, 2, 2, 1, 3, 4, 4, 3};
-    //ndarray* A = new_ndarray(4,2, d);
-
-    int n = 0;
-
-    for (int i = 0; i < 3; i++){
-        n += 1 << (28 - i);
-    }
-
-    n = (int)sqrt(n);
-    
-    ndarray* A = cuda_ndarrayHost(25, 20);
-    ndarray* B = cuda_ndarrayHost(20, 1);
-    
-    //printf("%lf GB\n", ( n* n* sizeof(float)) / (double) pow(2, 30));
-
-    init(A, 1);
-    init(B, 1);
-    //print(A);
-    //print(B);
-    //darray * C = cudaMTranspose(A, 1, true);
-    //ndarray* C = cudaVSDivision(A, 2, 1, true, true);
-    //ndarray* C = cudaMMSub(A, A, 2, true, true);
-    //ndarray* C = cudaMSProduct(A, 2, 1, true, true);
-    //float d = cudaEDistance(A, B, 1, false);
-    //print(A);
-    //print(B);
-    ndarray* C = cudaMMProduct(A, B, true);
-    
-    //ndarray* cov = cuda_ndarrayHost(2,2);
-    //initCOV(cov);
-    //print(cov);
-    //ndarray* C = eigenvectors(cov, 2, 1e-6, 50);
-    print(C);
-    //printf("%lf\n", d);
-
-}*/
