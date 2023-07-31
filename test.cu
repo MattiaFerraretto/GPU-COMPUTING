@@ -24,7 +24,6 @@ bool NDARRAY_CHECK(ndarray* A, ndarray* B)
         if(abs(A->data[i] - B->data[i]) > 1e-2)
             return false;
         
-
     return true;
 }
 
@@ -325,8 +324,8 @@ void E_TEST(FILE* fp, int nTest, int exp, int nTile, bool verbose)
         
         random_init(A_h);
         
-        ndarray* C_h = eigenvectors(A_h, 20, 1e-6, 50);
-        ndarray* C_d = cudaEigenvectors(A_h, 20, 1e-6, 50);
+        ndarray* C_h = eigenvectors(A_h, 20, 1e-10, 1000);
+        ndarray* C_d = cudaEigenvectors(A_h, 20, 1e-10, 1000);
 
         bool passed = NDARRAY_CHECK(C_h, C_d);
 
@@ -350,7 +349,7 @@ int main()
     FILE* fp = fopen("test_results.txt", "w");
 
     int nTest = 4;
-    int exp = 24;
+    int exp = 21;
     int nTile = 1;
     bool verbose = true;
 

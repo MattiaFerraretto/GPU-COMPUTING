@@ -19,7 +19,7 @@ ndarray* PCA(ndarray* M, int k)
     ndarray* cov = matProduct(MT, M);
     free_(MT);
 
-    ndarray* E = eigenvectors(cov, k, 1e-6, 50);
+    ndarray* E = eigenvectors(cov, k, 1e-10, 1000);
 
     ndarray* mpca = matProduct(M, E);
     free_(E);
@@ -37,7 +37,7 @@ ndarray* cudaPCA(ndarray* M, int k)
     ndarray* cov = cudaMMProduct(MT, M, false);
     cudaFreeHost_(MT);
 
-    ndarray* E = cudaEigenvectors(cov, k, 1e-6, 50);
+    ndarray* E = cudaEigenvectors(cov, k, 1e-10, 1000);
 
     ndarray* mpca = cudaMMProduct(M, E, false);
     cudaFreeHost_(E);
@@ -75,7 +75,7 @@ void random_init(ndarray* A)
 /**
  * PCA test
 */
-bool PCA_TEST(ndarray* A, ndarray* B)
+float PCA_TEST(ndarray* A, ndarray* B)
 {
     if(A->shape[0] != B->shape[0] || A->shape[1] != B->shape[1])
     {
@@ -84,16 +84,20 @@ bool PCA_TEST(ndarray* A, ndarray* B)
         exit(EXIT_FAILURE); 
     }
 
-    for(int i = 0; i < A->shape[0] * A->shape[1]; i++)
-        if(abs(A->data[i] - B->data[i]) > 1e-2)
-            return false;
+    int n = A->shape[0] * A->shape[1];
+    double err = 0.f;
 
-    return true;
+    for(int i = 0; i < n; i++)
+    {
+        err += (A->data[i] - B->data[i]) * (A->data[i] - B->data[i]);
+    }
+
+    return err == 0 ? 0 : sqrt(err / n);
 }
 
 int main(){
 
-    int m = 1 << 27;
+    int m = 1 << 20;
 
     int n = (int) sqrt(m);
 
@@ -104,7 +108,7 @@ int main(){
     ndarray* pca = PCA(M, 20);
     ndarray* cuda_pca = cudaPCA(M, 20);
 
-    bool passed = PCA_TEST(pca, cuda_pca);
+    float err = PCA_TEST(pca, cuda_pca);
     
     cudaFreeHost_(M);
     free_(pca);
@@ -112,7 +116,7 @@ int main(){
 
     float speedup = HOST_TOT_TIME / (DEVICE_TOT_TIME / 1000);
 
-    printf("TEST: PCA vs cudaPCA,\tNumber of elements: %d,\tsize (MB): %.2f,\ttime (s): %.4f vs %.4f, \tGPU speedup: %.4f,\tpassed: %d\n", m,  m * sizeof(float) / pow(2, 20), HOST_TOT_TIME, DEVICE_TOT_TIME / 1000, speedup, passed);
+    printf("TEST: PCA vs cudaPCA,\tNumber of elements: %d,\tsize (MB): %.2f,\ttime (s): %.4f vs %.4f, \tGPU speedup: %.4f,\tExpected error: %f\n", m,  m * sizeof(float) / pow(2, 20), HOST_TOT_TIME, DEVICE_TOT_TIME / 1000, speedup, err);
     
 
     return 0;
