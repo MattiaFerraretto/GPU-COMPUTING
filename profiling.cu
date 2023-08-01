@@ -24,7 +24,7 @@ void random_init(ndarray* A)
 int main()
 {
 
-    int m = 1 << 27;
+    int m = 1 << 29;
 
     int n = (int) sqrt(m);
 
