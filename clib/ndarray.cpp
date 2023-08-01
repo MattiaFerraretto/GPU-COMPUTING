@@ -2,6 +2,9 @@
 #include "ndarray.h"
 
 
+/**
+ * See the documentation of new_ndarray function in the file ndarray.h 
+*/
 ndarray* new_ndarray(int rows, int columns)
 {
     ndarray* a = (ndarray*)malloc(sizeof(ndarray));
@@ -16,6 +19,9 @@ ndarray* new_ndarray(int rows, int columns)
     return a;
 }
 
+/**
+ * See the documentation of free_ function in the file ndarray.h 
+*/
 void free_(ndarray* A)
 {
     free(A->shape);
@@ -23,6 +29,9 @@ void free_(ndarray* A)
     free(A);
 }
 
+/**
+ * See the documentation of init function in the file ndarray.h 
+*/
 void init(ndarray* A, float value)
 {
     for(int i = 0; i < A->shape[0] * A->shape[1]; i++)
@@ -31,12 +40,18 @@ void init(ndarray* A, float value)
     }
 }
 
+/**
+ * See the documentation of reshape function in the file ndarray.h 
+*/
 void reshape(ndarray* A, int rows, int columns)
 {
     A->shape[0] = rows;
     A->shape[1] = columns;
 }
 
+/**
+ * See the documentation of print function in the file ndarray.h 
+*/
 void print(ndarray* A)
 {   
     if(A == NULL)
@@ -69,6 +84,9 @@ void print(ndarray* A)
 
 }
 
+/**
+ * See the documentation of printShape function in the file ndarray.h 
+*/
 void printShape(ndarray* A)
 {
     if(A == NULL)
@@ -80,6 +98,9 @@ void printShape(ndarray* A)
     printf("%p's shape: (%d, %d)\n\n", A, A->shape[0], A->shape[1]);
 }
 
+/**
+ * See the documentation of csv2ndarray function in the file ndarray.h 
+*/
 void csv2ndarry(ndarray* dest, const char* src, const char* delimiter)
 {
     FILE* fp = fopen(src, "r");
@@ -108,6 +129,9 @@ void csv2ndarry(ndarray* dest, const char* src, const char* delimiter)
 
 }
 
+/**
+ * See the documentation of ndarray2csv function in the file ndarray.h 
+*/
 void ndarray2csv(const char* dest, ndarray* src, const char* delimiter)
 {
     if(src == NULL)

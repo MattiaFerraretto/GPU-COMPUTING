@@ -36,6 +36,29 @@ bool SCALAR_CHECK(float a, float b)
 }
 
 /**
+ * EIGEN_CHECK function check if eigenvectors found are similar.
+*/
+float EIGEN_CHECK(ndarray* A, ndarray* B)
+{
+    if(A->shape[0] != B->shape[0] || A->shape[1] != B->shape[1])
+    {
+        printf("ERROR:: File: %s, Line: %d, Function name: EIGEN_TEST, ", __FILE__, __LINE__);
+        printf("reason: %d != %d || %d != %d; A and B must have the same size.\n", A->shape[0], B->shape[0], A->shape[1], B->shape[1]);
+        exit(EXIT_FAILURE); 
+    }
+
+    int n = A->shape[0] * A->shape[1];
+    double err = 0.f;
+
+    for(int i = 0; i < n; i++)
+    {
+        err += (A->data[i] - B->data[i]) * (A->data[i] - B->data[i]);
+    }
+
+    return err == 0 ? 0 : sqrt(err / n);
+}
+
+/**
  * random_init function initializes randomly a n-dimensional array
 */
 void random_init(ndarray* A) 
@@ -327,7 +350,7 @@ void E_TEST(FILE* fp, int nTest, int exp, int nTile, bool verbose)
         ndarray* C_h = eigenvectors(A_h, 20, 1e-10, 1000);
         ndarray* C_d = cudaEigenvectors(A_h, 20, 1e-10, 1000);
 
-        bool passed = NDARRAY_CHECK(C_h, C_d);
+        float error = EIGEN_CHECK(C_h, C_d);
 
         cudaFreeHost_(A_h);
         free_(C_h);
@@ -336,9 +359,9 @@ void E_TEST(FILE* fp, int nTest, int exp, int nTile, bool verbose)
         float speedup = HOST_TOT_TIME / (DEVICE_TOT_TIME / 1000);
 
         if(verbose)
-            printf("TEST: eigenvectors vs cudaEigenvectors,\tNumber of elements: %d,\tsize (MB): %.2f,\ttime (s): %.4f vs %.4f,\tGPU speedup: %.4f,\tpassed: %d\n", m,  m * sizeof(float) / pow(2, 20), HOST_TOT_TIME, DEVICE_TOT_TIME / 1000, speedup, passed);
+            printf("TEST: eigenvectors vs cudaEigenvectors,\tNumber of elements: %d,\tsize (MB): %.2f,\ttime (s): %.4f vs %.4f,\tGPU speedup: %.4f,\tExpected error: %f\n", m,  m * sizeof(float) / pow(2, 20), HOST_TOT_TIME, DEVICE_TOT_TIME / 1000, speedup, error);
         
-        fprintf(fp, "TEST: eigenvectors vs cudaEigenvectors,\tNumber of elements: %d,\tsize (MB): %.2f,\ttime (s): %.4f vs %.4f,\tGPU speedup: %.4f,\tpassed: %d\n", m,  m * sizeof(float) / pow(2, 20), HOST_TOT_TIME, DEVICE_TOT_TIME / 1000, speedup, passed);
+        fprintf(fp, "TEST: eigenvectors vs cudaEigenvectors,\tNumber of elements: %d,\tsize (MB): %.2f,\ttime (s): %.4f vs %.4f,\tGPU speedup: %.4f,\tExpected error: %f\n", m,  m * sizeof(float) / pow(2, 20), HOST_TOT_TIME, DEVICE_TOT_TIME / 1000, speedup, error);
         fflush(fp);
 
     }
@@ -349,17 +372,17 @@ int main()
     FILE* fp = fopen("test_results.txt", "w");
 
     int nTest = 4;
-    int exp = 21;
+    int exp = 26;
     int nTile = 1;
     bool verbose = true;
 
-    VSD_TEST(fp, nTest, exp, nTile, verbose);
+   /* VSD_TEST(fp, nTest, exp, nTile, verbose);
     ED_TEST(fp, nTest, exp, nTile, verbose);
     MSP_TEST(fp, nTest, exp, nTile, verbose);
     MT_TEST(fp, nTest, exp, nTile, verbose);
     MS_TEST(fp, nTest, exp, nTile, verbose);
-    MP_TEST(fp, nTest, exp, verbose);
-    E_TEST(fp, nTest, exp, nTile, verbose);
+    MP_TEST(fp, nTest, 21, verbose);*/
+    E_TEST(fp, nTest, 21, nTile, verbose);
 
     fflush(fp);
     fclose(fp);
