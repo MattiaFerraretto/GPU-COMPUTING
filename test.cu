@@ -376,12 +376,12 @@ int main()
     int nTile = 1;
     bool verbose = true;
 
-   /* VSD_TEST(fp, nTest, exp, nTile, verbose);
+   VSD_TEST(fp, nTest, exp, nTile, verbose);
     ED_TEST(fp, nTest, exp, nTile, verbose);
     MSP_TEST(fp, nTest, exp, nTile, verbose);
     MT_TEST(fp, nTest, exp, nTile, verbose);
     MS_TEST(fp, nTest, exp, nTile, verbose);
-    MP_TEST(fp, nTest, 21, verbose);*/
+    MP_TEST(fp, nTest, 21, verbose);
     E_TEST(fp, nTest, 21, nTile, verbose);
 
     fflush(fp);
