@@ -429,14 +429,13 @@ __global__ void cudaMSProduct(ndarray A, ndarray C, float value, int rowOffset, 
     __shared__ float tile[BLOCKDIMX][BLOCKDIMY];
 
 
-    if(i >=  rowsTile || j >= columns)
-        return ;
+    if(i < rowsTile && j < columns)
+        tile[threadIdx.y][threadIdx.x] = A.data[columns * (i + rf) + j];
 
-
-    tile[threadIdx.y][threadIdx.x] = A.data[columns * (i + rf) + j];
     __syncthreads();
 
-    C.data[columns * (i + rf) + j] = tile[threadIdx.y][threadIdx.x] * scalar;
+    if(i < rowsTile && j < columns)
+        C.data[columns * (i + rf) + j] = tile[threadIdx.y][threadIdx.x] * scalar;
 }
 
 /**
@@ -542,6 +541,7 @@ __global__ void cudaMTranspose(ndarray A, ndarray AT, int rowOffset, int rowsTil
     int rf = rowOffset;
     int rows = A.shape[0];
     int columns = A.shape[1];
+
     __shared__ float tile[BLOCKDIMX][BLOCKDIMY];
     
 
@@ -658,16 +658,18 @@ __global__ void cudaMMSub(ndarray A, ndarray B, ndarray C, int rowOffset, int ro
 
     __shared__ float As[BLOCKDIMX][BLOCKDIMY];
     __shared__ float Bs[BLOCKDIMX][BLOCKDIMY];
+    
 
-    if(i >= rowsTile  || j >= columns)
-        return ;
-
-    As[threadIdx.y][threadIdx.x] = A.data[columns * (i + rf) + j];
-    Bs[threadIdx.y][threadIdx.x] = B.data[columns * (i + rf) + j];
-
+    if(i < rowsTile  && j < columns)
+    {
+        As[threadIdx.y][threadIdx.x] = A.data[columns * (i + rf) + j];
+        Bs[threadIdx.y][threadIdx.x] = B.data[columns * (i + rf) + j];
+    }
+    
     __syncthreads();
 
-    C.data[columns * (i + rf) + j] = As[threadIdx.y][threadIdx.x] - Bs[threadIdx.y][threadIdx.x];
+    if(i < rowsTile  && j < columns)
+        C.data[columns * (i + rf) + j] = As[threadIdx.y][threadIdx.x] - Bs[threadIdx.y][threadIdx.x];
 }
 
 /**
